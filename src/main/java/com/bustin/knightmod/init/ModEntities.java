@@ -3,6 +3,7 @@ package com.bustin.knightmod.init;
 import com.bustin.knightmod.KnightMod;
 import com.bustin.knightmod.entity.TestEntity;
 import com.bustin.knightmod.entity.dark_knight.DarkKnightEntity;
+import com.bustin.knightmod.entity.projectile.RunicBlastProjectile;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -27,6 +28,14 @@ public final class ModEntities {
                     .sized(1.0F, 2.5F)
                     .clientTrackingRange(10)
                     .build(new ResourceLocation(KnightMod.MOD_ID, "dark_knight").toString()));
+
+    public static final RegistryObject<EntityType<RunicBlastProjectile>> RUNIC_BLAST = ENTITIES.register("runic_blast",
+            () -> EntityType.Builder.<RunicBlastProjectile>of(RunicBlastProjectile::new, MobCategory.MISC)
+                    .sized(0.5F, 0.5F)
+                    .clientTrackingRange(8)
+                    .updateInterval(1)
+                    .build("runic_blast")
+            );
 
     private ModEntities() {
     }
