@@ -2,6 +2,8 @@ package com.bustin.knightmod.entity.dark_knight;
 
 import iskallia.vault.core.util.WeightedList;
 import iskallia.vault.entity.boss.VaultBossBaseEntity;
+import iskallia.vault.entity.boss.attack.BasicMeleeAttack;
+import iskallia.vault.entity.boss.attack.BossMeleeAttackGoal;
 import iskallia.vault.entity.boss.attack.IMeleeAttack;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -30,7 +32,7 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
     // ATTACKS
     // ==============================
 
-    // We will add our attacks here later.
+    public static final String HEAVY_SLAM = "heavy_slam";
 
     // ==============================
     // ANIMATIONS
@@ -54,6 +56,7 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
         return Monster.createMonsterAttributes()
                 .add(Attributes.MAX_HEALTH, 500.0D)
                 .add(Attributes.ATTACK_DAMAGE, 15.0D)
+                .add(Attributes.ATTACK_KNOCKBACK, 1.0D)
                 .add(Attributes.MOVEMENT_SPEED, 0.25D)
                 .add(Attributes.FOLLOW_RANGE, 35.0D)
                 .add(Attributes.ARMOR, 10.0D)
@@ -66,6 +69,9 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
 
     @Override
     protected void registerGoals() {
+
+        this.goalSelector.addGoal(2, new BossMeleeAttackGoal(this)
+        );
 
         this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 12.0F)
         );
@@ -83,15 +89,35 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
     // ATTACK SYSTEM
     // ==============================
 
+    public static final BasicMeleeAttack.BasicMeleeAttackAttributes
+            HEAVY_SLAM_ATTRIBUTES = new BasicMeleeAttack.BasicMeleeAttackAttributes(
+                    new BasicMeleeAttack.BasicMeleeAttackAttributes.Slice(-0.1F, 0.6F),
+                    40, 24, HEAVY_SLAM, 2.0F, 10.0F
+            );
+
+
+
+    // FACTORIES
+    public static final Map<String, BiFunction<VaultBossBaseEntity, Double, IMeleeAttack>> ATTACK_FACTORIES = Map.of(
+            HEAVY_SLAM, (boss, multiplier) -> new BasicMeleeAttack(boss, multiplier, HEAVY_SLAM_ATTRIBUTES)
+    );
+
+
+
+
+
     @Override
     public Map<String, BiFunction<VaultBossBaseEntity, Double, IMeleeAttack>> getMeleeAttackFactories() {
-
-        return Map.of();
+        return ATTACK_FACTORIES;
     }
 
     @Override
     public WeightedList<AttackData> getMeleeAttacks() {
-        return WeightedList.empty();
+        WeightedList<AttackData> attacks = new WeightedList<>();
+
+        attacks.add(new AttackData(HEAVY_SLAM, 1.0D), 100);
+
+        return attacks;
     }
 
     @Override
@@ -110,11 +136,7 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
 
     @Override
     public ServerBossEvent getServerBossInfo() {
-        return new ServerBossEvent(
-                getDisplayName(),
-                BossEvent.BossBarColor.PURPLE,
-                BossEvent.BossBarOverlay.PROGRESS
-        );
+        return new ServerBossEvent(getDisplayName(), BossEvent.BossBarColor.PURPLE, BossEvent.BossBarOverlay.PROGRESS);
     }
 
     // ==============================
