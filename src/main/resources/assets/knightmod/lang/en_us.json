@@ -1,5 +1,6 @@
 {
   "item.knightmod.test_item": "Test Item",
   "block.knightmod.test_block": "Test Block",
-  "entity.knightmod.test_entity": "Test Entity"
+  "entity.knightmod.test_entity": "Test Entity",
+  "entity.knightmod.dark_knight": "Dark Knight"
 }

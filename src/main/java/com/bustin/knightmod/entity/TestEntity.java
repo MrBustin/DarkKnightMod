@@ -1,4 +1,4 @@
-package com.bustin.knightmod.world.entity;
+package com.bustin.knightmod.entity;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.monster.Zombie;

@@ -1,6 +1,6 @@
 package com.bustin.knightmod.client.renderer;
 
-import com.bustin.knightmod.world.entity.TestEntity;
+import com.bustin.knightmod.entity.TestEntity;
 import net.minecraft.client.model.ZombieModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;

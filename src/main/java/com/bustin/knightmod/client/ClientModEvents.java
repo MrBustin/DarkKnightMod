@@ -1,6 +1,7 @@
 package com.bustin.knightmod.client;
 
 import com.bustin.knightmod.KnightMod;
+import com.bustin.knightmod.client.renderer.DarkKnightRenderer;
 import com.bustin.knightmod.client.renderer.TestEntityRenderer;
 import com.bustin.knightmod.init.ModEntities;
 import net.minecraft.client.renderer.entity.EntityRenderers;
@@ -16,6 +17,9 @@ public final class ClientModEvents {
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> EntityRenderers.register(ModEntities.TEST_ENTITY.get(), TestEntityRenderer::new));
+        event.enqueueWork(() -> {
+            EntityRenderers.register(ModEntities.TEST_ENTITY.get(), TestEntityRenderer::new);
+            EntityRenderers.register(ModEntities.DARK_KNIGHT.get(), DarkKnightRenderer::new);
+        });
     }
 }
