@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "knightmod:block/test_block"
+    }
+  }
+}

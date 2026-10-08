@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.bustin.knightmod.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "knightmod.refmap.json",
+  "mixins": [
+    "MinecraftServerMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
