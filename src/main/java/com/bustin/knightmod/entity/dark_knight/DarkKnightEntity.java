@@ -1,5 +1,6 @@
 package com.bustin.knightmod.entity.dark_knight;
 
+import com.bustin.knightmod.entity.dark_knight.util.DarkKnightPlayerAnalyzer;
 import iskallia.vault.core.util.WeightedList;
 import iskallia.vault.entity.boss.VaultBossBaseEntity;
 import iskallia.vault.entity.boss.attack.BasicMeleeAttack;
@@ -10,6 +11,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
@@ -27,12 +29,14 @@ import java.util.Map;
 import java.util.function.BiFunction;
 
 public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable {
+    private final DarkKnightPlayerAnalyzer analyzer = new DarkKnightPlayerAnalyzer();
 
     // ==============================
     // ATTACKS
     // ==============================
 
     public static final String HEAVY_SLAM = "heavy_slam";
+    public static final String WIDE_SWEEP = "wide_sweep";
 
     // ==============================
     // ANIMATIONS
@@ -85,6 +89,30 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
         // Attack goal will be added later.
     }
 
+    @Override
+    public void aiStep() {
+        super.aiStep();
+
+        if (level.isClientSide || tickCount % 20 != 0) {
+            return;
+        }
+
+        LivingEntity target = getTarget();
+
+        if (target != null && target.isAlive()) {
+            analyzer.observe(distanceTo(target));
+
+//            System.out.println(
+//                    "[DARK KNIGHT] Player: " + target.getName().getString()
+//                            + " | Distance: " + String.format("%.2f", distanceTo(target))
+//                            + " | Detected Style: " + analyzer.getPlayerStyle()
+//            );
+
+        } else {
+            analyzer.reset();
+        }
+    }
+
     // ==============================
     // ATTACK SYSTEM
     // ==============================
@@ -93,13 +121,22 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
             HEAVY_SLAM_ATTRIBUTES = new BasicMeleeAttack.BasicMeleeAttackAttributes(
                     new BasicMeleeAttack.BasicMeleeAttackAttributes.Slice(-0.1F, 0.6F),
                     40, 24, HEAVY_SLAM, 2.0F, 10.0F
-            );
+    );
+
+    public static final BasicMeleeAttack.BasicMeleeAttackAttributes
+            WIDE_SWEEP_ATTRIBUTES = new BasicMeleeAttack.BasicMeleeAttackAttributes(
+            new BasicMeleeAttack.BasicMeleeAttackAttributes.Slice(0.0F, 0.2F),
+            30, 15, WIDE_SWEEP, 5.0F, 0.1F
+    );
+
+
 
 
 
     // FACTORIES
     public static final Map<String, BiFunction<VaultBossBaseEntity, Double, IMeleeAttack>> ATTACK_FACTORIES = Map.of(
-            HEAVY_SLAM, (boss, multiplier) -> new BasicMeleeAttack(boss, multiplier, HEAVY_SLAM_ATTRIBUTES)
+            HEAVY_SLAM, (boss, multiplier) -> new BasicMeleeAttack(boss, multiplier, HEAVY_SLAM_ATTRIBUTES),
+            WIDE_SWEEP, (boss, multiplier) -> new BasicMeleeAttack(boss, multiplier, WIDE_SWEEP_ATTRIBUTES)
     );
 
 
@@ -115,7 +152,23 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
     public WeightedList<AttackData> getMeleeAttacks() {
         WeightedList<AttackData> attacks = new WeightedList<>();
 
-        attacks.add(new AttackData(HEAVY_SLAM, 1.0D), 100);
+        switch (analyzer.getPlayerStyle()) {
+
+            case MELEE -> {
+                attacks.add(new AttackData(HEAVY_SLAM, 1.0D), 20);
+                attacks.add(new AttackData(WIDE_SWEEP, 0.75D), 80);
+            }
+
+            case RANGED -> {
+                attacks.add(new AttackData(HEAVY_SLAM, 1.0D), 80);
+                attacks.add(new AttackData(WIDE_SWEEP, 0.75D), 20);
+            }
+
+            case BALANCED -> {
+                attacks.add(new AttackData(HEAVY_SLAM, 1.0D), 50);
+                attacks.add(new AttackData(WIDE_SWEEP, 0.75D), 50);
+            }
+        }
 
         return attacks;
     }
