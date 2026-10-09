@@ -121,14 +121,29 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
             analyzer.observe(distanceTo(target));
 
 //            System.out.println(
-//                    "[DARK KNIGHT] Player: " + target.getName().getString()
-//                            + " | Distance: " + String.format("%.2f", distanceTo(target))
-//                            + " | Detected Style: " + analyzer.getPlayerStyle()
+//                    "[DARK KNIGHT]"
+//                            + " | Distance Style: " + analyzer.getPlayerStyle()
+//                            + " | Aggression: " + analyzer.getAggressionLevel()
+//                            + " | Damage Events: " + analyzer.getRecentDamageEvents()
 //            );
 
         } else {
             analyzer.reset();
         }
+    }
+
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+
+        boolean wasHurt = super.hurt(source, amount);
+
+        if (!level.isClientSide && wasHurt
+                && source.getEntity() instanceof Player) {
+
+            analyzer.recordDamageEvent(level.getGameTime());
+        }
+
+        return wasHurt;
     }
 
     // ==============================
@@ -228,60 +243,103 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
 
         LivingEntity target = getTarget();
 
-        if (target == null) {
+        if (target == null || !target.isAlive()) {
             return attacks;
         }
 
         double distanceSqr = distanceToSqr(target);
 
-        // Ranged attack selection
-        if (distanceSqr >= 25.0D) {
+        // Get the player's learned behaviors
+        var style = analyzer.getPlayerStyle();
+        var aggression = analyzer.getAggressionLevel();
 
-            if (distanceSqr <= 324.0D) {
-                attacks.add(new AttackData(RUNIC_BLAST, 1.0D), 100);
-            }
+        // Base attack weights
+        int heavySlamWeight = 35;
+        int wideSweepWeight = 35;
+        int earthquakeWeight = 15;
+        int runicBlastWeight = 15;
 
-            return attacks;
-        }
+        // ==========================
+        // DISTANCE PREFERENCE
+        // ==========================
 
-        // Close-range attack selection
-        switch (analyzer.getPlayerStyle()) {
+        switch (style) {
 
             case MELEE -> {
-                attacks.add(
-                        new AttackData(EARTH_QUAKE, 1.0D), 20
-                );
-                attacks.add(
-                        new AttackData(HEAVY_SLAM, 1.0D), 15
-                );
-                attacks.add(
-                        new AttackData(WIDE_SWEEP, 0.75D), 65
-                );
+                wideSweepWeight += 20;
+                earthquakeWeight += 15;
             }
 
             case RANGED -> {
-                attacks.add(
-                        new AttackData(EARTH_QUAKE, 1.0D), 10
-                );
-                attacks.add(
-                        new AttackData(HEAVY_SLAM, 1.0D), 65
-                );
-                attacks.add(
-                        new AttackData(WIDE_SWEEP, 0.75D), 25
-                );
+                runicBlastWeight += 35;
             }
 
             case BALANCED -> {
-                attacks.add(
-                        new AttackData(EARTH_QUAKE, 1.0D), 15
-                );
-                attacks.add(
-                        new AttackData(HEAVY_SLAM, 1.0D), 45
-                );
-                attacks.add(
-                        new AttackData(WIDE_SWEEP, 0.75D), 40
-                );
+                // Keep default weights
             }
+        }
+
+        // ==========================
+        // AGGRESSION
+        // ==========================
+
+        switch (aggression) {
+
+            case AGGRESSIVE -> {
+                // Pressure players who frequently attack
+                wideSweepWeight += 15;
+                earthquakeWeight += 20;
+            }
+
+            case PASSIVE -> {
+                // Favor deliberate, punishable attacks
+                heavySlamWeight += 20;
+                runicBlastWeight += 10;
+            }
+
+            case MODERATE -> {
+                // Keep default weights
+            }
+        }
+
+        // ==========================
+        // CURRENT RANGE
+        // ==========================
+
+        // The current BossMeleeAttackGoal uses getAttackReach()
+        // as a squared-distance threshold when starting melee attacks.
+        // With getAttackReach() = 4, melee starts within ~2 blocks.
+
+        if (distanceSqr <= getAttackReach()) {
+
+            attacks.add(
+                    new AttackData(HEAVY_SLAM, 1.0D),
+                    heavySlamWeight
+            );
+
+            attacks.add(
+                    new AttackData(WIDE_SWEEP, 0.75D),
+                    wideSweepWeight
+            );
+        }
+
+        // Earthquake eligibility depends on BasicAbilityAttack.start().
+        // This assumes it accepts targets within its configured maxRange.
+        if (distanceSqr <= 7.0D * 7.0D) {
+
+            attacks.add(
+                    new AttackData(EARTH_QUAKE, 1.0D),
+                    earthquakeWeight
+            );
+        }
+
+        // Runic Blast is usable between 5 and 18 blocks.
+        if (distanceSqr >= 25.0D && distanceSqr <= 324.0D) {
+
+            attacks.add(
+                    new AttackData(RUNIC_BLAST, 1.0D),
+                    runicBlastWeight
+            );
         }
 
         return attacks;
@@ -294,7 +352,7 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
 
     @Override
     public double getAttackReach() {
-        return 4.0D;
+        return 16.0D;
     }
 
     // ==============================
