@@ -1,5 +1,6 @@
 package com.bustin.knightmod.entity.dark_knight;
 
+import com.bustin.knightmod.entity.dark_knight.attacks.BasicAbilityAttack;
 import com.bustin.knightmod.entity.dark_knight.attacks.BasicRangedAttack;
 import com.bustin.knightmod.entity.dark_knight.util.DarkKnightPlayerAnalyzer;
 import com.bustin.knightmod.entity.projectile.RunicBlastProjectile;
@@ -8,10 +9,16 @@ import iskallia.vault.entity.boss.VaultBossBaseEntity;
 import iskallia.vault.entity.boss.attack.BasicMeleeAttack;
 import iskallia.vault.entity.boss.attack.BossMeleeAttackGoal;
 import iskallia.vault.entity.boss.attack.IMeleeAttack;
+import iskallia.vault.init.ModNetwork;
+import iskallia.vault.network.message.ClientboundEarthquakeRippleMessage;
+import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.BossEvent;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -22,6 +29,8 @@ import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import software.bernie.geckolib3.core.IAnimatable;
 import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
@@ -43,6 +52,9 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
 
     //Ranged
     public static final String RUNIC_BLAST = "runic_blast";
+
+    //Other
+    public static final String EARTH_QUAKE = "earth_quake";
 
     // ==============================
     // ANIMATIONS
@@ -127,7 +139,7 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
     public static final BasicMeleeAttack.BasicMeleeAttackAttributes
             HEAVY_SLAM_ATTRIBUTES = new BasicMeleeAttack.BasicMeleeAttackAttributes(
                     new BasicMeleeAttack.BasicMeleeAttackAttributes.Slice(-0.1F, 0.6F),
-                    40, 24, HEAVY_SLAM, 2.0F, 10.0F
+                    40, 24, HEAVY_SLAM, 2.0F, 5.0F
     );
 
     public static final BasicMeleeAttack.BasicMeleeAttackAttributes
@@ -142,8 +154,11 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
                     35, 0, RUNIC_BLAST, 2.7F, 0.0F, 5.0F, 18.0F, 0.65F
     );
 
-
-
+    //Other
+    public static final BasicAbilityAttack.BasicAbilityAttackAttributes
+            EARTH_QUAKE_ATTRIBUTES = new BasicAbilityAttack.BasicAbilityAttackAttributes(
+                    50, 25, EARTH_QUAKE, 30.0F, 0.0F, 7.0F
+    );
 
 
     // FACTORIES
@@ -152,12 +167,54 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
             WIDE_SWEEP, (boss, multiplier) -> new BasicMeleeAttack(boss, multiplier, WIDE_SWEEP_ATTRIBUTES),
 
             RUNIC_BLAST, (boss, multiplier) -> new BasicRangedAttack(boss, multiplier, RUNIC_BLAST_ATTRIBUTES,
-                    (entity, level) -> new RunicBlastProjectile(level, entity))
+                    (entity, level) -> new RunicBlastProjectile(level, entity)),
+
+            EARTH_QUAKE, (boss, multiplier) -> new BasicAbilityAttack(
+                    boss, multiplier, EARTH_QUAKE_ATTRIBUTES, DarkKnightEntity::castEarthquake)
     );
 
+    /**
+     * Boss-safe example based on Vault Hunters' Earthquake ability: damage and knock back
+     * nearby enemies, then emit ground particles from the cast position.
+     */
+    private static void castEarthquake(VaultBossBaseEntity caster, LivingEntity target, float damage) {
+        if (!(caster.level instanceof ServerLevel level)) {
+            return;
+        }
 
+        double radius = EARTH_QUAKE_ATTRIBUTES.maxRange();
+        Vec3 center = caster.position();
 
+        // This is the packet used by Vault Hunters' EarthquakeAbility. Its client handler
+        // feeds EarthquakeRippleRenderer, producing the expanding ground ring.
+        ModNetwork.sendTrackingChunk(
+                new ClientboundEarthquakeRippleMessage(center, (float) radius, 0, false),
+                level.getChunkAt(caster.blockPosition())
+        );
 
+        level.getEntitiesOfClass(
+                LivingEntity.class,
+                caster.getBoundingBox().inflate(radius, 2.0D, radius),
+                entity -> entity != caster && entity.isAlive() && !caster.isAlliedTo(entity)
+        ).stream().filter(entity -> entity.position().distanceToSqr(center) <= radius * radius).forEach(entity -> {
+            if (entity.hurt(DamageSource.mobAttack(caster), damage)) {
+                Vec3 knockback = entity.position().subtract(center).multiply(1.0D, 0.0D, 1.0D);
+                if (knockback.lengthSqr() > 1.0E-4D) {
+                    knockback = knockback.normalize();
+                    entity.push(knockback.x * 1.5D, 0.45D, knockback.z * 1.5D);
+                }
+            }
+        });
+
+        BlockState ground = level.getBlockState(caster.blockPosition().below());
+        level.sendParticles(
+                new BlockParticleOption(ParticleTypes.BLOCK, ground),
+                center.x, center.y + 0.1D, center.z,
+                80, radius * 0.5D, 0.25D, radius * 0.5D, 0.15D
+        );
+        level.playSound(null, caster.blockPosition(), SoundEvents.GENERIC_EXPLODE,
+                SoundSource.HOSTILE, 1.5F, 0.65F);
+    }
 
     @Override
     public Map<String, BiFunction<VaultBossBaseEntity, Double, IMeleeAttack>> getMeleeAttackFactories() {
@@ -192,28 +249,37 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
 
             case MELEE -> {
                 attacks.add(
-                        new AttackData(HEAVY_SLAM, 1.0D), 20
+                        new AttackData(EARTH_QUAKE, 1.0D), 20
                 );
                 attacks.add(
-                        new AttackData(WIDE_SWEEP, 0.75D), 80
+                        new AttackData(HEAVY_SLAM, 1.0D), 15
+                );
+                attacks.add(
+                        new AttackData(WIDE_SWEEP, 0.75D), 65
                 );
             }
 
             case RANGED -> {
                 attacks.add(
-                        new AttackData(HEAVY_SLAM, 1.0D), 70
+                        new AttackData(EARTH_QUAKE, 1.0D), 10
                 );
                 attacks.add(
-                        new AttackData(WIDE_SWEEP, 0.75D), 30
+                        new AttackData(HEAVY_SLAM, 1.0D), 65
+                );
+                attacks.add(
+                        new AttackData(WIDE_SWEEP, 0.75D), 25
                 );
             }
 
             case BALANCED -> {
                 attacks.add(
-                        new AttackData(HEAVY_SLAM, 1.0D), 50
+                        new AttackData(EARTH_QUAKE, 1.0D), 15
                 );
                 attacks.add(
-                        new AttackData(WIDE_SWEEP, 0.75D), 50
+                        new AttackData(HEAVY_SLAM, 1.0D), 45
+                );
+                attacks.add(
+                        new AttackData(WIDE_SWEEP, 0.75D), 40
                 );
             }
         }
