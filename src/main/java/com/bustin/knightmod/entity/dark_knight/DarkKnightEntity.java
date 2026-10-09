@@ -1,6 +1,7 @@
 package com.bustin.knightmod.entity.dark_knight;
 
 import com.bustin.knightmod.entity.dark_knight.attacks.BasicAbilityAttack;
+import com.bustin.knightmod.entity.dark_knight.attacks.BeamAttack;
 import com.bustin.knightmod.entity.dark_knight.attacks.BasicRangedAttack;
 import com.bustin.knightmod.entity.dark_knight.util.DarkKnightPlayerAnalyzer;
 import com.bustin.knightmod.entity.projectile.RunicBlastProjectile;
@@ -52,6 +53,7 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
 
     //Ranged
     public static final String RUNIC_BLAST = "runic_blast";
+    public static final String LOCK_ON_BEAM = "lock_on_beam";
 
     //Other
     public static final String EARTH_QUAKE = "earth_quake";
@@ -169,6 +171,11 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
                     35, 0, RUNIC_BLAST, 2.7F, 0.0F, 5.0F, 18.0F, 0.65F
     );
 
+    public static final BeamAttack.BeamAttackAttributes
+            LOCK_ON_BEAM_ATTRIBUTES = new BeamAttack.BeamAttackAttributes(
+                    80, 60, LOCK_ON_BEAM, 40.0F, 6.0F, 25.0F, 0.7F, 0.45F
+    );
+
     //Other
     public static final BasicAbilityAttack.BasicAbilityAttackAttributes
             EARTH_QUAKE_ATTRIBUTES = new BasicAbilityAttack.BasicAbilityAttackAttributes(
@@ -183,6 +190,8 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
 
             RUNIC_BLAST, (boss, multiplier) -> new BasicRangedAttack(boss, multiplier, RUNIC_BLAST_ATTRIBUTES,
                     (entity, level) -> new RunicBlastProjectile(level, entity)),
+
+            LOCK_ON_BEAM, (boss, multiplier) -> new BeamAttack(boss, multiplier, LOCK_ON_BEAM_ATTRIBUTES),
 
             EARTH_QUAKE, (boss, multiplier) -> new BasicAbilityAttack(
                     boss, multiplier, EARTH_QUAKE_ATTRIBUTES, DarkKnightEntity::castEarthquake)
@@ -258,6 +267,7 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
         int wideSweepWeight = 35;
         int earthquakeWeight = 15;
         int runicBlastWeight = 15;
+        int lockOnBeamWeight = 10;
 
         // ==========================
         // DISTANCE PREFERENCE
@@ -272,6 +282,7 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
 
             case RANGED -> {
                 runicBlastWeight += 35;
+                lockOnBeamWeight += 25;
             }
 
             case BALANCED -> {
@@ -295,6 +306,7 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
                 // Favor deliberate, punishable attacks
                 heavySlamWeight += 20;
                 runicBlastWeight += 10;
+                lockOnBeamWeight += 10;
             }
 
             case MODERATE -> {
@@ -339,6 +351,15 @@ public class DarkKnightEntity extends VaultBossBaseEntity implements IAnimatable
             attacks.add(
                     new AttackData(RUNIC_BLAST, 1.0D),
                     runicBlastWeight
+            );
+        }
+
+        // Lock-on Beam charges for 60 ticks (3 seconds). Cover intercepts the
+        // beam, and prevents damage if it remains in the way when it discharges.
+        if (distanceSqr >= 36.0D && distanceSqr <= 625.0D && hasLineOfSight(target)) {
+            attacks.add(
+                    new AttackData(LOCK_ON_BEAM, 1.0D),
+                    lockOnBeamWeight
             );
         }
 

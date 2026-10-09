@@ -25,7 +25,7 @@ public final class ModEntities {
 
     public static final RegistryObject<EntityType<DarkKnightEntity>> DARK_KNIGHT = ENTITIES.register("dark_knight",
             () -> EntityType.Builder.of(DarkKnightEntity::new, MobCategory.MONSTER)
-                    .sized(1.0F, 2.5F)
+                    .sized(1.0F, 4.5F)
                     .clientTrackingRange(10)
                     .build(new ResourceLocation(KnightMod.MOD_ID, "dark_knight").toString()));
 
